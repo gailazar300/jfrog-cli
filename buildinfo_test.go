@@ -544,8 +544,10 @@ func testBuildAddGit(t *testing.T, useEnvBuildNameAndNumber bool) {
 	expectedVcsRevision := "b033a0e508bdb52eee25654c9e12db33ff01b8ff"
 	buildInfoVcsUrl := buildInfo.VcsList[0].Url
 	buildInfoVcsRevision := buildInfo.VcsList[0].Revision
+	buildInfoVcsBranch := buildInfo.VcsList[0].Branch
 	assert.Equal(t, expectedVcsRevision, buildInfoVcsRevision, "Wrong revision")
 	assert.Equal(t, expectedVcsUrl, buildInfoVcsUrl, "Wrong url")
+	assert.Equal(t, buildInfoVcsBranch, buildInfoVcsBranch, "Wrong branch")
 	assert.False(t, buildInfo.Issues == nil || len(buildInfo.Issues.AffectedIssues) != 4,
 		"Wrong issues number, expected 4 issues, received: %+v", *buildInfo.Issues)
 	cleanArtifactoryTest()
@@ -576,8 +578,11 @@ func TestReadGitConfig(t *testing.T) {
 	if !strings.HasSuffix(url, ".git") {
 		url += ".git"
 	}
-
 	assert.Equal(t, url, gitManager.GetUrl(), "Wrong url")
+
+	branch, _, err := gitExecutor.GetBranch()
+	require.NoError(t, err)
+	assert.Equal(t, branch, gitManager.GetBranch(), "Wrong branch")
 	cleanArtifactoryTest()
 }
 
