@@ -5,6 +5,7 @@ import (
 	corecommon "github.com/jfrog/jfrog-cli-core/docs/common"
 	"github.com/jfrog/jfrog-cli/docs/common"
 	installdocs "github.com/jfrog/jfrog-cli/docs/plugin/install"
+	publishdocs "github.com/jfrog/jfrog-cli/docs/plugin/publish"
 	uninstalldocs "github.com/jfrog/jfrog-cli/docs/plugin/uninstall"
 	"github.com/jfrog/jfrog-cli/plugins/commands"
 )
@@ -33,6 +34,19 @@ func GetCommands() []cli.Command {
 			BashComplete: corecommon.CreateBashCompletionFunc(),
 			Action: func(c *cli.Context) error {
 				return commands.UninstallCmd(c)
+			},
+		},
+
+		{
+			Name:         "publish",
+			Aliases:      []string{"ui"},
+			Usage:        publishdocs.Description,
+			HelpName:     corecommon.CreateUsage("plugin publish", publishdocs.Description, publishdocs.Usage),
+			UsageText:    publishdocs.Arguments,
+			ArgsUsage:    common.CreateEnvVars(),
+			BashComplete: corecommon.CreateBashCompletionFunc(),
+			Action: func(c *cli.Context) error {
+				return commands.PublishCmd(c)
 			},
 		},
 	}
