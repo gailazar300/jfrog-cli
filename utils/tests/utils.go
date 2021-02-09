@@ -96,7 +96,7 @@ func init() {
 	HideUnitTestLog = flag.Bool("test.hideUnitTestLog", false, "Hide unit tests logs and print it in a file")
 	TestPip = flag.Bool("test.pip", false, "Test Pip")
 	PipVirtualEnv = flag.String("rt.pipVirtualEnv", "", "Pip virtual-environment path")
-	TestPlugins = flag.Bool("test.plugins", false, "Test Plugins")
+	TestPlugins = flag.Bool("test.plugins", true, "Test Plugins")
 }
 
 func CleanFileSystem() {

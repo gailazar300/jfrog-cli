@@ -2,6 +2,8 @@ package commands
 
 import (
 	"errors"
+	"fmt"
+	"github.com/jfrog/jfrog-cli-core/utils/config"
 	"net/http"
 	"os"
 	"path"
@@ -31,10 +33,13 @@ func InstallCmd(c *cli.Context) error {
 	if c.NArg() != 1 {
 		return cliutils.PrintHelpAndReturnError("Wrong number of arguments.", c)
 	}
-	return runInstallCmd(c.Args().Get(0))
+	rtDetails, _ := config.GetDefaultArtifactoryConf()
+	clientDetails := NewHttpClientDetailsFromArtifactoryDetails(rtDetails)
+	fmt.Println(clientDetails)
+	return runInstallCmd(c.Args().Get(0), clientDetails)
 }
 
-func runInstallCmd(requestedPlugin string) error {
+func runInstallCmd(requestedPlugin string, clientDetails *httputils.HttpClientDetails) error {
 	pluginName, version, err := getNameAndVersion(requestedPlugin)
 	if err != nil {
 		return err
@@ -43,7 +48,7 @@ func runInstallCmd(requestedPlugin string) error {
 	if err != nil {
 		return err
 	}
-	downloadUrl := utils.AddTrailingSlashIfNeeded(pluginsRegistryUrl) + srcPath
+	downloadUrl := utils.AddTrailingSlashIfNeeded(coreutils.GetPluginServer()) + srcPath
 
 	pluginsDir, err := coreutils.GetJfrogPluginsDir()
 	if err != nil {
@@ -55,7 +60,7 @@ func runInstallCmd(requestedPlugin string) error {
 		return err
 	}
 	if exists {
-		should, err := shouldDownloadPlugin(pluginsDir, pluginName, downloadUrl)
+		should, err := shouldDownloadPlugin(pluginsDir, pluginName, downloadUrl, clientDetails)
 		if err != nil {
 			return err
 		}
@@ -69,10 +74,18 @@ func runInstallCmd(requestedPlugin string) error {
 		}
 	}
 
-	return downloadPlugin(pluginsDir, pluginName, downloadUrl)
+	return downloadPlugin(pluginsDir, pluginName, downloadUrl, clientDetails)
 }
-
-func shouldDownloadPlugin(pluginsDir, pluginName, downloadUrl string) (bool, error) {
+func NewHttpClientDetailsFromArtifactoryDetails(rtDetails *config.ArtifactoryDetails) *httputils.HttpClientDetails {
+	headers := make(map[string]string)
+	return &httputils.HttpClientDetails{
+		User:        rtDetails.User,
+		Password:    rtDetails.Password,
+		ApiKey:      rtDetails.ApiKey,
+		AccessToken: rtDetails.AccessToken,
+		Headers:     headers}
+}
+func shouldDownloadPlugin(pluginsDir, pluginName, downloadUrl string, clientDetails *httputils.HttpClientDetails) (bool, error) {
 	log.Debug("Verifying plugin download is needed...")
 	client, err := httpclient.ClientBuilder().Build()
 	if err != nil {
@@ -80,7 +93,7 @@ func shouldDownloadPlugin(pluginsDir, pluginName, downloadUrl string) (bool, err
 	}
 	log.Debug("Fetching plugin details from: ", downloadUrl)
 
-	details, resp, err := client.GetRemoteFileDetails(downloadUrl, httputils.HttpClientDetails{})
+	details, resp, err := client.GetRemoteFileDetails(downloadUrl, *clientDetails)
 	if err != nil {
 		return false, err
 	}
@@ -105,7 +118,7 @@ func createPluginsDir(pluginsDir string) error {
 	return os.MkdirAll(pluginsDir, 0777)
 }
 
-func downloadPlugin(pluginsDir, pluginName, downloadUrl string) error {
+func downloadPlugin(pluginsDir, pluginName, downloadUrl string, clientDetails *httputils.HttpClientDetails) error {
 	exeName := pluginsutils.GetPluginExecutableName(pluginName)
 	log.Debug("Downloading plugin from: ", downloadUrl)
 	downloadDetails := &httpclient.DownloadFileDetails{
@@ -131,8 +144,7 @@ func downloadPlugin(pluginsDir, pluginName, downloadUrl string) error {
 		defer progressMgr.Quit()
 	}
 	log.Info("Downloading plugin: " + pluginName)
-
-	resp, err := client.DownloadFileWithProgress(downloadDetails, "", httputils.HttpClientDetails{}, 3, false, progressMgr)
+	resp, err := client.DownloadFileWithProgress(downloadDetails, "", *clientDetails, 3, false, progressMgr)
 	if err != nil {
 		return err
 	}
@@ -143,6 +155,29 @@ func downloadPlugin(pluginsDir, pluginName, downloadUrl string) error {
 	}
 	log.Debug("Plugin downloaded successfully.")
 	return os.Chmod(filepath.Join(pluginsDir, exeName), 0777)
+}
+func createArtifactoryDetailsFromOptions(c *cli.Context) (details *config.ArtifactoryDetails) {
+	details = new(config.ArtifactoryDetails)
+	details.Url = c.String("url")
+	details.DistributionUrl = c.String("dist-url")
+	details.ApiKey = c.String("apikey")
+	details.User = c.String("user")
+	details.Password = c.String("password")
+	details.SshKeyPath = c.String("ssh-key-path")
+	details.SshPassphrase = c.String("ssh-passphrase")
+	details.AccessToken = c.String("access-token")
+	details.ClientCertPath = c.String("client-cert-path")
+	details.ClientCertKeyPath = c.String("client-cert-key-path")
+	details.ServerId = c.String("server-id")
+	details.InsecureTls = c.Bool("insecure-tls")
+	if details.ApiKey != "" && details.User != "" && details.Password == "" {
+		// The API Key is deprecated, use password option instead.
+		details.Password = details.ApiKey
+		details.ApiKey = ""
+	}
+	details.Url = utils.AddTrailingSlashIfNeeded(details.Url)
+	details.DistributionUrl = utils.AddTrailingSlashIfNeeded(details.DistributionUrl)
+	return
 }
 
 func getNameAndVersion(requested string) (name, version string, err error) {
