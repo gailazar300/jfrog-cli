@@ -9,7 +9,6 @@ import (
 	artifactoryUtils "github.com/jfrog/jfrog-cli-core/artifactory/utils"
 	"github.com/jfrog/jfrog-cli-core/utils/config"
 	"github.com/jfrog/jfrog-cli-core/utils/ioutils"
-	serviceutils "github.com/jfrog/jfrog-client-go/artifactory/services/utils"
 	ioUtils "github.com/jfrog/jfrog-client-go/utils/io"
 	"net/http"
 	"os"
@@ -89,36 +88,44 @@ func NewHttpClientDetailsFromArtifactoryDetails(rtDetails *config.ArtifactoryDet
 		Headers:     headers}
 }
 func shouldDownloadPlugin(pluginsDir, pluginName, srcPath, downloadUrl string, private bool, c *cli.Context) (bool, error) {
+	var checksumMd5, checksumSha1 string
 	if private {
-		return shouldDownloadPrivatePlugin(pluginsDir, pluginName, srcPath, downloadUrl, c)
+		details, err := GetLocalPluginDetails(srcPath, c)
+		if err != nil {
+			return false, err
+		}
+		checksumMd5 = details.Md5
+		checksumSha1 = details.Sha1
+	} else {
+		details, err := GetRemotePluginDetails(pluginsDir, pluginName, downloadUrl)
+		if err != nil {
+			return false, err
+		}
+		checksumMd5 = details.Checksum.Md5
+		checksumSha1 = details.Checksum.Sha1
 	}
-	return shouldDownloadPublicPlugin(pluginsDir, pluginName, downloadUrl)
+	isEqual, err := fileutils.IsEqualToLocalFile(filepath.Join(pluginsDir, pluginName), checksumMd5, checksumSha1)
+	return !isEqual, err
 }
 
-func shouldDownloadPrivatePlugin(pluginsDir, pluginName, srcPath, downloadUrl string, c *cli.Context) (bool, error) {
-	searchPrivatePlugin(srcPath, c)
-	return true, nil
-
-}
-func shouldDownloadPublicPlugin(pluginsDir, pluginName, downloadUrl string) (bool, error) {
+func GetRemotePluginDetails(pluginsDir, pluginName, downloadUrl string) (*fileutils.FileDetails, error) {
 	log.Debug("Verifying plugin download is needed...")
 	client, err := httpclient.ClientBuilder().Build()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	log.Debug("Fetching plugin details from: ", downloadUrl)
 
 	details, resp, err := client.GetRemoteFileDetails(downloadUrl, httputils.HttpClientDetails{})
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	log.Debug("Artifactory response: ", resp.Status)
 	err = errorutils.CheckResponseStatus(resp, http.StatusOK)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	isEqual, err := fileutils.IsEqualToLocalFile(filepath.Join(pluginsDir, pluginName), details.Checksum.Md5, details.Checksum.Sha1)
-	return !isEqual, err
+	return details, nil
 }
 
 func buildSrcPath(pluginName, version string) (string, error) {
@@ -179,7 +186,6 @@ func downloadPlugin(pluginsDir, pluginName, srcPath, downloadUrl string, private
 	} else {
 		downloadPublicPlugin(pluginsDir, pluginName, exeName, downloadUrl, progressMgr)
 	}
-
 	return os.Chmod(filepath.Join(pluginsDir, exeName), 0777)
 }
 
@@ -249,28 +255,29 @@ func downloadPrivatePlugin(pluginsDir, srcPath string, c *cli.Context, progressM
 
 	return cliutils.GetCliError(err, result.SuccessCount(), result.FailCount(), false)
 }
-func searchPrivatePlugin(srcPath string, c *cli.Context) error {
+func GetLocalPluginDetails(srcPath string, c *cli.Context) (*artifactoryUtils.SearchResult, error) {
 	searchSpec, err := createDefaultSearchSpec(srcPath, c)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = spec.ValidateSpec(searchSpec.Files, false, true)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	artDetails, err := createArtifactoryDetailsWithConfigOffer(c, false)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	searchCmd := generic.NewSearchCommand()
 	searchCmd.SetRtDetails(artDetails).SetSpec(searchSpec)
 	searchCmd.Run()
-	result := searchCmd.Result()
-	fmt.Println(result)
-	for resultItem := new(serviceutils.ResultItem); result.Reader().NextRecord(resultItem) == nil; resultItem = new(serviceutils.ResultItem) {
-		fmt.Println(result)
+	reader := searchCmd.Result().Reader()
+	searchResult := new(artifactoryUtils.SearchResult)
+	err = reader.NextRecord(searchResult)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	return searchResult, nil
 }
 func createDefaultSearchSpec(srcPath string, c *cli.Context) (*spec.SpecFiles, error) {
 	offset, limit := 0, 0
