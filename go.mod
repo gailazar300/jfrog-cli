@@ -26,5 +26,6 @@ require (
 // replace github.com/jfrog/gocmd => github.com/jfrog/gocmd master
 
 // replace github.com/jfrog/gofrog => github.com/jfrog/gofrog v1.0.6
-replace github.com/jfrog/jfrog-client-go => ../jfrog-client-go
-replace github.com/jfrog/jfrog-cli-core => ../jfrog-cli-core
+replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.19.2-0.20210222173345-875606ea7568
+
+replace github.com/jfrog/jfrog-cli-core => github.com/gailazar300/jfrog-cli-core v1.2.7-0.20210201145248-e4ab584a01a0
