@@ -48,7 +48,7 @@ func runInstallCmd(requestedPlugin string, c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	srcPath, err := buildSrcPath(pluginName, version)
+	srcPath, err := buildSrcPath(pluginName, version, installPrivate)
 	if err != nil {
 		return err
 	}
@@ -128,12 +128,16 @@ func GetRemotePluginDetails(pluginsDir, pluginName, downloadUrl string) (*fileut
 	return details, nil
 }
 
-func buildSrcPath(pluginName, version string) (string, error) {
+func buildSrcPath(pluginName, version string, installPrivate bool) (string, error) {
 	arc, err := getArchitecture()
 	if err != nil {
 		return "", err
 	}
-	return path.Join(pluginsRegistryRepo, pluginName, version, arc, pluginsutils.GetPluginExecutableName(pluginName)), nil
+	pluginRepo := pluginsRegistryRepo
+	if installPrivate {
+		pluginRepo, _ = getPluginRepo()
+	}
+	return path.Join(pluginRepo, pluginName, version, arc, pluginsutils.GetPluginExecutableName(pluginName)), nil
 }
 
 func createPluginsDir(pluginsDir string) error {
@@ -182,9 +186,12 @@ func downloadPlugin(pluginsDir, pluginName, srcPath, downloadUrl string, private
 	log.Info("Downloading plugin: " + pluginName)
 	exeName := pluginsutils.GetPluginExecutableName(pluginName)
 	if private {
-		downloadPrivatePlugin(pluginsDir, srcPath, c, progressMgr)
+		err = downloadPrivatePlugin(pluginsDir, srcPath, c)
 	} else {
-		downloadPublicPlugin(pluginsDir, pluginName, exeName, downloadUrl, progressMgr)
+		err = downloadPublicPlugin(pluginsDir, pluginName, exeName, downloadUrl, progressMgr)
+	}
+	if err != nil {
+		return err
 	}
 	return os.Chmod(filepath.Join(pluginsDir, exeName), 0777)
 }
@@ -231,7 +238,14 @@ func getPluginServer() (pluginServer string, envVariable bool) {
 	}
 	return pluginServer, true
 }
-func downloadPrivatePlugin(pluginsDir, srcPath string, c *cli.Context, progressMgr ioUtils.ProgressMgr) error {
+func getPluginRepo() (pluginRepo string, envVariable bool) {
+	pluginRepo = os.Getenv(coreutils.PluginServer)
+	if pluginRepo == "" {
+		return pluginsRegistryRepo, false
+	}
+	return pluginRepo, true
+}
+func downloadPrivatePlugin(pluginsDir, srcPath string, c *cli.Context) error {
 	rtDetails, err := createArtifactoryDetailsWithConfigOffer(c, false)
 	if err != nil {
 		return err
@@ -249,10 +263,8 @@ func downloadPrivatePlugin(pluginsDir, srcPath string, c *cli.Context, progressM
 	downloadCommand := generic.NewDownloadCommand()
 	downloadCommand.SetConfiguration(configuration).SetBuildConfiguration(buildConfiguration).SetSpec(downloadSpec).SetRtDetails(rtDetails)
 	downloadCommand.Run()
-
 	result := downloadCommand.Result()
 	err = cliutils.PrintSummaryReport(result.SuccessCount(), result.FailCount(), result.Reader(), rtDetails.Url, err)
-
 	return cliutils.GetCliError(err, result.SuccessCount(), result.FailCount(), false)
 }
 func GetLocalPluginDetails(srcPath string, c *cli.Context) (*artifactoryUtils.SearchResult, error) {
