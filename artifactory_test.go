@@ -77,6 +77,7 @@ func authenticate(configCli bool) string {
 	var cred string
 	if configCli {
 		cred += "--artifactory-url=" + *tests.RtUrl
+		cred += " --xray-url=" + *tests.XrUrl
 	} else {
 		cred += "--url=" + *tests.RtUrl
 	}

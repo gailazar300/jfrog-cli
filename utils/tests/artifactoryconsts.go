@@ -84,6 +84,7 @@ const (
 	PypiVirtualRepositoryConfig            = "pypi_virtual_repository_config.json"
 	RepoDetailsUrl                         = "api/repositories/"
 	RtServerId                             = "rtTestServerId"
+	XrServerId                             = "xrTestServerId"
 	SearchAllDocker                        = "search_all_docker.json"
 	SearchAllGradle                        = "search_all_gradle.json"
 	SearchAllMaven                         = "search_all_maven.json"

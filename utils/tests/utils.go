@@ -66,9 +66,12 @@ var HideUnitTestLog *bool
 var TestPip *bool
 var PipVirtualEnv *string
 var TestPlugins *bool
+var XrUrl *string
+var TestXray *bool
 
 func init() {
 	RtUrl = flag.String("rt.url", "http://127.0.0.1:8081/artifactory/", "Artifactory url")
+	XrUrl = flag.String("xr.url", "http://127.0.0.1:8081/xray", "Xrayurl")
 	RtUser = flag.String("rt.user", "admin", "Artifactory username")
 	RtPassword = flag.String("rt.password", "password", "Artifactory password")
 	RtApiKey = flag.String("rt.apikey", "", "Artifactory user API key")
@@ -89,6 +92,7 @@ func init() {
 	TestNpm = flag.Bool("test.npm", false, "Test Npm")
 	TestGradle = flag.Bool("test.gradle", false, "Test Gradle")
 	TestMaven = flag.Bool("test.maven", false, "Test Maven")
+	TestXray = flag.Bool("test.xray", true, "Test Xray")
 	DockerRepoDomain = flag.String("rt.dockerRepoDomain", "", "Docker repository domain")
 	DockerVirtualRepo = flag.String("rt.dockerVirtualRepo", "", "Docker virtual repo")
 	DockerRemoteRepo = flag.String("rt.dockerRemoteRepo", "", "Docker remote repo")
@@ -382,6 +386,7 @@ func GetNonVirtualRepositories() map[*string]string {
 		TestNuget:        {},
 		TestPip:          {&PypiRemoteRepo},
 		TestPlugins:      {&RtRepo1},
+		TestXray:         {},
 	}
 	return getNeededRepositories(nonVirtualReposMap)
 }

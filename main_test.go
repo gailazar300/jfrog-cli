@@ -52,6 +52,9 @@ func setupIntegrationTests() {
 	if *tests.TestPlugins {
 		InitPluginsTests()
 	}
+	if *tests.TestXray {
+		InitXrayTests()
+	}
 }
 
 func tearDownIntegrationTests() {
@@ -69,6 +72,9 @@ func tearDownIntegrationTests() {
 	}
 	if *tests.TestPlugins {
 		CleanPluginsTests()
+	}
+	if *tests.TestXray {
+		CleanXrayTests()
 	}
 }
 
