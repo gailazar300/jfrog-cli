@@ -21,7 +21,7 @@ func initXrayTest(t *testing.T) {
 
 func InitXrayTests() {
 	initXrayCli()
-	//	tests.AddTimestampToGlobalVars()
+	////	tests.AddTimestampToGlobalVars()
 }
 
 func CleanXrayTests() {
