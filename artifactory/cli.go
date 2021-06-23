@@ -686,7 +686,7 @@ func GetCommands() []cli.Command {
 			ArgsUsage:    common.CreateEnvVars(),
 			BashComplete: corecommon.CreateBashCompletionFunc(),
 			Action: func(c *cli.Context) error {
-				return goCmd(c, goPublishCmd, goLegacyPublishCmd)
+				return goCmdHandler(c, goPublishCmd, goLegacyPublishCmd)
 			},
 		},
 		{
@@ -700,7 +700,7 @@ func GetCommands() []cli.Command {
 			SkipFlagParsing: shouldSkipGoFlagParsing(),
 			BashComplete:    corecommon.CreateBashCompletionFunc(),
 			Action: func(c *cli.Context) error {
-				return goCmd(c, goNativeCmd, goLegacyCmd)
+				return goCmd(c)
 			},
 		},
 		{
@@ -1843,7 +1843,7 @@ func shouldSkipGradleFlagParsing() bool {
 	return exists
 }
 
-func goCmd(c *cli.Context, goCmd func(*cli.Context, string) error, legacyGoCmd func(*cli.Context) error) error {
+func goCmdHandler(c *cli.Context, goCmd func(*cli.Context, string) error, legacyGoCmd func(*cli.Context) error) error {
 	if show, err := showCmdHelpIfNeeded(c); show || err != nil {
 		return err
 	}
@@ -1858,46 +1858,6 @@ func goCmd(c *cli.Context, goCmd func(*cli.Context, string) error, legacyGoCmd f
 		return goCmd(c, configFilePath)
 	}
 	return legacyGoCmd(c)
-}
-
-func goLegacyCmd(c *cli.Context) error {
-	log.Warn(deprecatedWarningWithExample(utils.Go, os.Args[2], "go-config"))
-	// When the no-registry set to false (default), two arguments are mandatory: go command and the target repository
-	if !c.Bool("no-registry") && c.NArg() != 2 {
-		return cliutils.PrintHelpAndReturnError("Wrong number of arguments.", c)
-	}
-	// When the no-registry is set to true this means that the resolution will not be done via Artifactory.
-	// For automation purposes of users, keeping the possibility to pass the repository although we are not using it.
-	if c.Bool("no-registry") && c.NArg() > 2 {
-		return cliutils.PrintHelpAndReturnError("Wrong number of arguments.", c)
-	}
-	goArg, err := coreutils.ParseArgs(strings.Split(c.Args().Get(0), " "))
-	if err != nil {
-		err = cliutils.PrintSummaryReport(0, 1, err)
-	}
-	targetRepo := c.Args().Get(1)
-	details, err := createArtifactoryDetailsByFlags(c, false)
-	if err != nil {
-		return err
-	}
-	publishDeps := c.Bool("publish-deps")
-	buildConfiguration, err := createBuildConfigurationWithModule(c)
-	if err != nil {
-		return err
-	}
-	resolverRepo := &utils.RepositoryConfig{}
-	resolverRepo.SetTargetRepo(targetRepo).SetServerDetails(details)
-	goCmd := golang.NewGoCommand().SetBuildConfiguration(buildConfiguration).
-		SetGoArg(goArg).SetNoRegistry(c.Bool("no-registry")).
-		SetPublishDeps(publishDeps).SetResolverParams(resolverRepo)
-	if publishDeps {
-		goCmd.SetDeployerParams(resolverRepo)
-	}
-	err = commands.Exec(goCmd)
-	if err != nil {
-		err = cliutils.PrintSummaryReport(0, 1, err)
-	}
-	return err
 }
 
 func goPublishCmd(c *cli.Context, configFilePath string) error {
@@ -1942,18 +1902,29 @@ func goLegacyPublishCmd(c *cli.Context) error {
 	return cliutils.PrintSummaryReport(result.SuccessCount(), result.FailCount(), err)
 }
 
-func goNativeCmd(c *cli.Context, configFilePath string) error {
-	// Found a config file. Continue as native command.
+func goCmd(c *cli.Context) error {
+	if show, err := showCmdHelpIfNeeded(c); show || err != nil {
+		return err
+	}
 	if c.NArg() < 1 {
 		return cliutils.PrintHelpAndReturnError("Wrong number of arguments.", c)
 	}
+	configFilePath, exists, err := utils.GetProjectConfFilePath(utils.Go)
+	if err != nil {
+		return err
+	}
+	// Verify config file is found.
+	if !exists {
+		// TODO: Error!
+	}
+	log.Debug("Go config file was found in:", configFilePath)
 	args := cliutils.ExtractCommand(c)
 	// Validates the go command. If a config file is found, the only flags that can be used are build-name, build-number and module.
 	// Otherwise, throw an error.
 	if err := validateCommand(args, cliutils.GetLegacyGoFlags()); err != nil {
 		return err
 	}
-	goNative := golang.NewGoNativeCommand()
+	goNative := golang.NewGoCommand()
 	goNative.SetConfigFilePath(configFilePath).SetGoArg(args)
 	return commands.Exec(goNative)
 }
