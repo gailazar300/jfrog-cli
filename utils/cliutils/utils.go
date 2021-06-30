@@ -295,7 +295,6 @@ func CreateServerDetailsFromFlags(c *cli.Context) (details *config.ServerDetails
 	details.XrayUrl = clientutils.AddTrailingSlashIfNeeded(c.String(configXrUrl))
 	details.MissionControlUrl = clientutils.AddTrailingSlashIfNeeded(c.String(configMcUrl))
 	details.PipelinesUrl = clientutils.AddTrailingSlashIfNeeded(c.String(configPlUrl))
-	details.ApiKey = c.String(apikey)
 	details.User = c.String(user)
 	details.Password = c.String(password)
 	details.SshKeyPath = c.String(sshKeyPath)
